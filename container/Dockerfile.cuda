@@ -1,0 +1,56 @@
+# Dockerfile for chai-lab with NVIDIA CUDA base image
+# Build: docker build --platform linux/amd64 -f Dockerfile.cuda -t dxkb/chai-lab:latest-gpu .
+
+FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04 AS chailab-cuda
+
+ENV \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    DEBIAN_FRONTEND=noninteractive \
+    EDITOR=vim \
+    MYPY_CACHE_DIR='/tmp/.chai_lab_mypy_cache' \
+    PYTHONUNBUFFERED=TRUE \
+    PYTHONFAULTHANDLER=1 \
+    PYTHONPYCACHEPREFIX='/tmp/.chai_lab_pycache'
+
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt-get -qq update \
+    && apt-get -qq install -y \
+    gnupg ca-certificates wget git curl aria2 lsb-release tzdata \
+    rsync sudo tree htop tmux unzip \
+    openssh-server socat \
+    psmisc \
+    libibverbs1 librdmacm1 \
+    nano vim \
+    build-essential libstdc++6 \
+    python3.10 python3.10-dev python3.10-venv \
+    kalign \
+    && git config --global --add safe.directory "*" \
+    && dpkg-reconfigure --frontend noninteractive tzdata \
+    && chsh -s /bin/bash
+
+ENV \
+    UV_HTTP_TIMEOUT=1000 \
+    VIRTUAL_ENV=/opt/venv \
+    CHAI_LAB_DIR=/opt/chai-lab
+
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Clone chai-lab repository
+ARG CHAI_LAB_REPO=https://github.com/chaidiscovery/chai-lab.git
+ARG CHAI_LAB_VERSION=main
+RUN git clone --depth 1 --branch ${CHAI_LAB_VERSION} ${CHAI_LAB_REPO} ${CHAI_LAB_DIR}
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    curl -LsSf https://astral.sh/uv/0.5.4/install.sh | sh \
+    && . $HOME/.local/bin/env \
+    && uv venv --python python3.10 $VIRTUAL_ENV \
+    && . $VIRTUAL_ENV/bin/activate \
+    && uv pip install uv pip -e ${CHAI_LAB_DIR}
+
+RUN echo "PATH=\"$PATH\"" >> /etc/environment \
+    && echo "LANG=\"$LANG\"" >> /etc/environment \
+    && echo "LC_ALL=\"$LC_ALL\"" >> /etc/environment \
+    && echo "EDITOR=\"$EDITOR\"" >> /etc/environment
+
+# No startup command
