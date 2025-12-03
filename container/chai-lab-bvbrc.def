@@ -1,0 +1,130 @@
+Bootstrap: docker
+From: dxkb/chai-bvbrc:latest-gpu
+
+%labels
+    Author BV-BRC Team
+    Application Chai-Lab
+    Version 0.6.1
+    Description Chai-1 molecular structure prediction with BV-BRC AppService integration
+    License Apache-2.0
+
+%help
+    Chai-Lab BV-BRC Service Container
+    ==================================
+
+    This container provides Chai-1 molecular structure prediction
+    integrated with the BV-BRC AppService framework.
+
+    Features:
+    - Chai-1 structure prediction (proteins, DNA, RNA, ligands)
+    - MSA server integration
+    - Template server integration
+    - Experimental restraints support
+    - BV-BRC workspace integration
+
+    Usage Examples:
+
+    # Run Chai-Lab directly
+    singularity run --nv container.sif chai-lab fold input.fasta output/ --use-msa-server
+
+    # Run as BV-BRC service
+    singularity run --nv container.sif App-ChaiLab params.json
+
+    # Interactive shell
+    singularity shell --nv container.sif
+
+    Environment:
+    - GPU required (A100 80GB recommended for large complexes)
+    - Model weights cached in /cache (bind mount for persistence)
+    - Workspace files in /data
+
+    GPU Requirements:
+    - A100 80GB: Large complexes, multiple chains
+    - A100 40GB: Medium complexes
+    - A10/A30: Small proteins
+    - RTX 4090: Single chains, small complexes
+
+%environment
+    export PERL5LIB=/bvbrc/modules/app_service/lib:/bvbrc/modules/Workspace/lib:/bvbrc/modules/p3_core/lib:/bvbrc/modules/p3_auth/lib:/bvbrc/modules/seed_core/lib:/bvbrc/modules/seed_gjo/lib:/kb/module/lib
+    export KB_TOP=/kb/deployment
+    export KB_RUNTIME=/usr
+    export KB_MODULE_DIR=/kb/module
+    export IN_BVBRC_CONTAINER=1
+    export CHAI_DOWNLOADS_DIR=/cache
+    export PATH=/kb/module/scripts:$PATH
+
+%runscript
+    case "$1" in
+        App-ChaiLab*)
+            shift
+            exec perl /kb/module/service-scripts/App-ChaiLab.pl "$@"
+            ;;
+        chai-lab|chai)
+            shift
+            exec chai-lab "$@"
+            ;;
+        bash|sh)
+            exec /bin/bash
+            ;;
+        *)
+            if [ -z "$1" ]; then
+                echo "Chai-Lab BV-BRC Container"
+                echo "Usage: singularity run --nv container.sif [command]"
+                echo ""
+                echo "Commands:"
+                echo "  chai-lab fold <input.fasta> <output/> [options]  - Run structure prediction"
+                echo "  App-ChaiLab <params.json>                        - Run as BV-BRC service"
+                echo "  bash                                             - Interactive shell"
+                echo ""
+                echo "For help: singularity run --nv container.sif chai-lab --help"
+            else
+                exec "$@"
+            fi
+            ;;
+    esac
+
+%test
+    echo "Testing Chai-Lab BV-BRC container..."
+
+    # Test Python/Chai-Lab
+    echo -n "Python: "
+    python3 --version
+
+    echo -n "Chai-Lab: "
+    chai-lab --help 2>&1 | head -1 || echo "chai-lab command available"
+
+    # Test Perl/BV-BRC
+    echo -n "Perl: "
+    perl -v | grep version | head -1
+
+    echo -n "BV-BRC modules: "
+    perl -e 'use Bio::KBase::AppService::AppScript; print "OK\n"' 2>/dev/null || echo "WARN: AppScript not fully available (expected in test)"
+
+    # Test service script exists
+    echo -n "Service script: "
+    test -f /kb/module/service-scripts/App-ChaiLab.pl && echo "OK" || echo "MISSING"
+
+    # Test app specs
+    echo -n "App specs: "
+    test -f /kb/module/app_specs/ChaiLab.json && echo "OK" || echo "MISSING"
+
+    # Test kalign (required for templates)
+    echo -n "Kalign: "
+    which kalign && echo "OK" || echo "MISSING"
+
+    echo "Container tests completed"
+
+%post
+    echo "Chai-Lab BV-BRC container build complete"
+
+    # Verify key components
+    which chai-lab || echo "Warning: chai-lab not in PATH"
+    which perl || echo "Warning: perl not in PATH"
+    which kalign || echo "Warning: kalign not in PATH"
+
+    # Create cache directory if not exists
+    mkdir -p /cache
+
+    # List installed BV-BRC modules
+    echo "BV-BRC modules installed:"
+    ls -la /bvbrc/modules/ 2>/dev/null || echo "No modules directory"

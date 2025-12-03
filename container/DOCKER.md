@@ -210,3 +210,58 @@ The BV-BRC image sets up the following environment:
 - `p3_auth` - Authentication handling
 - `seed_core` - SEED framework utilities
 - `seed_gjo` - GJO utilities
+
+---
+
+## Apptainer/Singularity
+
+For HPC deployment, build an Apptainer image from the Docker image.
+
+### Building the Apptainer Image
+
+```bash
+# From Docker image
+singularity build chai-lab-bvbrc.sif docker://dxkb/chai-bvbrc:latest-gpu
+
+# Or from definition file
+singularity build chai-lab-bvbrc.sif chai-lab-bvbrc.def
+```
+
+### Running with Apptainer
+
+```bash
+# Run Chai-Lab prediction
+singularity run --nv chai-lab-bvbrc.sif chai-lab fold input.fasta output/ --use-msa-server
+
+# Run as BV-BRC service
+singularity run --nv chai-lab-bvbrc.sif App-ChaiLab params.json
+
+# Interactive shell
+singularity shell --nv chai-lab-bvbrc.sif
+
+# With bind mounts for data and cache persistence
+singularity run --nv \
+  --bind /path/to/data:/data \
+  --bind /path/to/output:/output \
+  --bind /path/to/cache:/cache \
+  chai-lab-bvbrc.sif chai-lab fold /data/input.fasta /output
+```
+
+### HPC Batch Job Example (Slurm)
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=chailab
+#SBATCH --gres=gpu:a100:1
+#SBATCH --mem=80G
+#SBATCH --time=4:00:00
+
+module load singularity
+
+singularity run --nv \
+  --bind $PWD/data:/data \
+  --bind $PWD/output:/output \
+  --bind $PWD/cache:/cache \
+  /path/to/chai-lab-bvbrc.sif \
+  chai-lab fold /data/input.fasta /output --use-msa-server
+```
