@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # Base Chai-Lab GPU service
+  chai-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.cuda
+    image: dxkb/chai:latest-gpu
+    container_name: chai-gpu
+    volumes:
+      - ./data:/data
+      - ./output:/output
+      - chai-cache:/cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - CHAI_DOWNLOADS_DIR=/cache
+    command: chai-lab --help
+
+  # BV-BRC integrated service
+  chai-bvbrc:
+    build:
+      context: ..
+      dockerfile: container/Dockerfile.chai-bvbrc
+    image: dxkb/chai-bvbrc:latest-gpu
+    container_name: chai-bvbrc
+    volumes:
+      - ./data:/data
+      - ./output:/output
+      - chai-cache:/cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - CHAI_DOWNLOADS_DIR=/cache
+      - IN_BVBRC_CONTAINER=1
+    command: chai-lab --help
+
+volumes:
+  chai-cache:
