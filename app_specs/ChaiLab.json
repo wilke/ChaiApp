@@ -1,0 +1,80 @@
+{
+    "id": "ChaiLab",
+    "script": "App-ChaiLab",
+    "label": "Chai-1 Molecular Structure Prediction",
+    "description": "Predict molecular structures using Chai-1, a multi-modal foundation model for proteins, small molecules, DNA, RNA, and glycosylations. Achieves state-of-the-art accuracy across diverse biomolecular prediction benchmarks.",
+    "default_memory": "64G",
+    "default_cpu": 8,
+    "default_runtime": 7200,
+    "parameters": [
+        {
+            "id": "input_file",
+            "type": "wsfile",
+            "required": 1,
+            "label": "Input FASTA File",
+            "desc": "Input file in FASTA format describing the molecular complex. Supports proteins, DNA, RNA, and small molecules (SMILES). Use modified residue notation [CCD] for post-translational modifications."
+        },
+        {
+            "id": "constraints_file",
+            "type": "wsfile",
+            "required": 0,
+            "label": "Constraints File (JSON)",
+            "desc": "Optional JSON file specifying distance restraints, contact constraints, and covalent bonds to guide structure prediction."
+        },
+        {
+            "id": "use_msa_server",
+            "type": "bool",
+            "default": true,
+            "required": 0,
+            "label": "Use MSA Server",
+            "desc": "Automatically generate Multiple Sequence Alignments using the ColabFold MMseqs2 server. Recommended for best accuracy."
+        },
+        {
+            "id": "use_templates_server",
+            "type": "bool",
+            "default": false,
+            "required": 0,
+            "label": "Use Templates Server",
+            "desc": "Automatically search for structural templates to guide prediction. Can improve accuracy for proteins with known homologs."
+        },
+        {
+            "id": "num_samples",
+            "type": "int",
+            "default": 5,
+            "required": 0,
+            "label": "Number of Samples",
+            "desc": "Number of structure samples to generate. Default is 5, providing a good balance of diversity and runtime."
+        },
+        {
+            "id": "msa_file",
+            "type": "wsfile",
+            "required": 0,
+            "label": "Pre-computed MSA File",
+            "desc": "Optional pre-computed MSA file in aligned.pqt format. If provided, overrides MSA server for the corresponding sequence."
+        },
+        {
+            "id": "template_hits_file",
+            "type": "wsfile",
+            "required": 0,
+            "label": "Template Hits File (m8)",
+            "desc": "Optional m8 file specifying template hits to use for structure prediction."
+        },
+        {
+            "id": "output_path",
+            "type": "folder",
+            "required": 1,
+            "label": "Output Folder",
+            "desc": "Workspace folder where prediction results will be saved."
+        }
+    ],
+    "preflight": {
+        "cpu": 8,
+        "memory": "64G",
+        "runtime": 7200,
+        "storage": "50G",
+        "policy": {
+            "gpu": 1,
+            "gpu_type": "a100"
+        }
+    }
+}

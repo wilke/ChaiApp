@@ -1,0 +1,16 @@
+{
+    "restraints": [
+        {
+            "type": "pocket",
+            "binder_chain": "L",
+            "pocket_residues": [
+                {"chain": "A", "residue": 120},
+                {"chain": "A", "residue": 145},
+                {"chain": "A", "residue": 167},
+                {"chain": "A", "residue": 189}
+            ],
+            "max_distance": 6.0
+        }
+    ],
+    "covalent_bonds": []
+}

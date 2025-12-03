@@ -1,0 +1,7 @@
+{
+    "input_file": "/data/simple_protein.fasta",
+    "output_path": "/output",
+    "use_msa_server": true,
+    "use_templates_server": false,
+    "num_samples": 1
+}
