@@ -1,0 +1,11 @@
+# Example CWL job file for Chai-Lab structure prediction
+# Usage: cwltool chailab.cwl chailab-job.yml
+
+input_fasta:
+  class: File
+  path: ../test_data/single_protein.fasta
+
+output_directory: chailab_output
+use_msa_server: true
+use_templates_server: false
+num_samples: 5
