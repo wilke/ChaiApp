@@ -3,7 +3,7 @@
 
 input_fasta:
   class: File
-  path: ../test_data/single_protein.fasta
+  path: ../test_data/simple_protein.fasta
 
 output_directory: chailab_output
 use_msa_server: true
