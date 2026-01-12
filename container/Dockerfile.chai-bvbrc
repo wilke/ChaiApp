@@ -1,5 +1,5 @@
 # BV-BRC Runtime Layer for Chai-Lab
-# Adds Perl, BV-BRC modules, and AppService support on top of base Chai image
+# Uses dxkb/dev_container:cuda12-ubuntu22.04 for standardized BV-BRC runtime
 #
 # Build: docker build --platform linux/amd64 -t dxkb/chai-bvbrc:latest-gpu -f Dockerfile.chai-bvbrc .
 # Run:   docker run --gpus all -v $(pwd)/data:/data -v $(pwd)/output:/output dxkb/chai-bvbrc:latest-gpu chai-lab fold /data/input.fasta /output
@@ -8,68 +8,56 @@ FROM --platform=linux/amd64 dxkb/chai:latest-gpu
 
 LABEL maintainer="BV-BRC Team"
 LABEL description="Chai-Lab with BV-BRC AppService integration"
-LABEL version="1.0.0"
+LABEL version="2.0.0"
+LABEL base.chai="dxkb/chai:latest-gpu"
+LABEL base.bvbrc="dxkb/dev_container:cuda12-ubuntu22.04"
 
-# Install Perl and system dependencies for BV-BRC
-# Note: Some packages may already be in base image, but --no-install-recommends keeps it lean
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    perl \
-    cpanminus \
-    libfindbin-libs-perl \
-    libjson-perl \
-    libjson-xs-perl \
-    libwww-perl \
-    libio-socket-ssl-perl \
-    libfile-slurp-perl \
-    libdata-dumper-simple-perl \
-    libgetopt-long-descriptive-perl \
-    liburi-perl \
-    liblwp-protocol-https-perl \
-    libhttp-message-perl \
-    libtext-csv-perl \
-    libdbi-perl \
-    make \
-    && rm -rf /var/lib/apt/lists/*
+# Copy BV-BRC runtime AND build system from dev_container
+# - /opt/patric-common: Perl 5.40.2 runtime + 200 CPAN modules + p3 CLI tools
+# - /build/dev_container: BV-BRC build system for deploying app code
+COPY --from=dxkb/dev_container:cuda12-ubuntu22.04 /opt/patric-common /opt/patric-common
+COPY --from=dxkb/dev_container:cuda12-ubuntu22.04 /build/dev_container /build/dev_container
 
-# Install additional Perl modules via cpanm
-RUN cpanm --notest \
-    Try::Tiny \
-    IPC::Run \
-    File::Which \
-    Template \
-    YAML::XS \
-    && rm -rf ~/.cpanm
+# Standard BV-BRC Environment Variables
+ENV RT=/opt/patric-common/runtime
+ENV KB_DEPLOYMENT=/opt/patric-common/deployment
+ENV KB_TOP=/opt/patric-common/deployment
+ENV PERL5LIB=$KB_DEPLOYMENT/lib:$RT/lib/perl5
+ENV PATH=$KB_DEPLOYMENT/bin:$RT/bin:$PATH
 
-# Create BV-BRC directory structure
-RUN mkdir -p /bvbrc/modules /kb/deployment /kb/module
-
-# Clone BV-BRC core modules (shallow clone for smaller image)
-WORKDIR /bvbrc/modules
-
-RUN git clone --depth 1 https://github.com/BV-BRC/p3_core.git && \
-    git clone --depth 1 https://github.com/BV-BRC/Workspace.git && \
-    git clone --depth 1 https://github.com/BV-BRC/app_service.git && \
-    git clone --depth 1 https://github.com/BV-BRC/p3_auth.git && \
-    git clone --depth 1 https://github.com/TheSEED/seed_core.git && \
-    git clone --depth 1 https://github.com/TheSEED/seed_gjo.git
-
-# Set up Perl library paths
-ENV PERL5LIB=/bvbrc/modules/app_service/lib:\
-/bvbrc/modules/Workspace/lib:\
-/bvbrc/modules/p3_core/lib:\
-/bvbrc/modules/p3_auth/lib:\
-/bvbrc/modules/seed_core/lib:\
-/bvbrc/modules/seed_gjo/lib:\
-/kb/module/lib
-
-# BV-BRC environment variables
-ENV KB_TOP=/kb/deployment
-ENV KB_RUNTIME=/usr
+# App-specific environment
 ENV KB_MODULE_DIR=/kb/module
 ENV IN_BVBRC_CONTAINER=1
 
 # Chai-Lab specific environment
 ENV CHAI_DOWNLOADS_DIR=/cache
+
+# Add additional BV-BRC modules needed for AppService
+# dev_container now includes: p3_auth, p3_cli, p3_core, Workspace, app_service
+# Only clone seed_core and seed_gjo if needed for additional functionality
+WORKDIR /build/dev_container/modules
+RUN git clone --depth 1 https://github.com/TheSEED/seed_core.git 2>/dev/null || true && \
+    git clone --depth 1 https://github.com/TheSEED/seed_gjo.git 2>/dev/null || true
+
+# Build additional modules using dev_container build system
+WORKDIR /build/dev_container
+RUN . ./user-env.sh && \
+    cd modules/seed_core && make -k 2>/dev/null || true && \
+    cd ../seed_gjo && make -k 2>/dev/null || true
+
+# Copy module libs to deployment (app_service already deployed by dev_container)
+RUN for mod in seed_core seed_gjo; do \
+        cp -r modules/$mod/lib/* $KB_DEPLOYMENT/lib/ 2>/dev/null || true; \
+    done
+
+# Install missing CPAN modules required by BV-BRC (not in dev_container base)
+# REST::Client requires IO::Socket::SSL which needs system SSL libraries
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libssl-dev \
+        zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && $RT/bin/cpanm --notest Net::SSLeay IO::Socket::SSL LWP::Protocol::https REST::Client Class::Accessor \
+    && rm -rf ~/.cpanm
 
 # Create directories for service components
 RUN mkdir -p /kb/module/service-scripts \
@@ -88,11 +76,11 @@ RUN chmod +x /kb/module/service-scripts/*.pl 2>/dev/null || true
 # Working directory for data
 WORKDIR /data
 
-# Create entrypoint script
+# Create entrypoint script using BV-BRC Perl runtime
 RUN echo '#!/bin/bash\n\
 case "$1" in\n\
     App-ChaiLab*)\n\
-        exec perl /kb/module/service-scripts/App-ChaiLab.pl "${@:2}"\n\
+        exec $RT/bin/perl /kb/module/service-scripts/App-ChaiLab.pl "${@:2}"\n\
         ;;\n\
     chai-lab|chai)\n\
         shift\n\
