@@ -1,0 +1,6 @@
+{
+    "input_file": "/awilke@bvbrc/home/ChaiLabTest/simple_protein.fasta",
+    "output_path": "/awilke@bvbrc/home/ChaiLabTest/output1",
+    "use_msa_server": true,
+    "use_templates_server": false
+}

@@ -1,0 +1,8 @@
+{
+    "input_file": "/data/multimer.fasta",
+    "output_path": "/output",
+    "output_file": "multimer_test",
+    "use_msa_server": true,
+    "use_templates_server": false,
+    "num_samples": 1
+}
