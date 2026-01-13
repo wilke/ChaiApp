@@ -4,8 +4,9 @@ From: dxkb/chai-bvbrc:latest-gpu
 %labels
     Author BV-BRC Team
     Application Chai-Lab
-    Version 0.6.1
+    Version 2.0.0
     Description Chai-1 molecular structure prediction with BV-BRC AppService integration
+    BaseImage dxkb/dev_container:cuda12-ubuntu22.04
     License Apache-2.0
 
 %help
@@ -37,27 +38,26 @@ From: dxkb/chai-bvbrc:latest-gpu
     - GPU required (A100 80GB recommended for large complexes)
     - Model weights cached in /cache (bind mount for persistence)
     - Workspace files in /data
-
-    GPU Requirements:
-    - A100 80GB: Large complexes, multiple chains
-    - A100 40GB: Medium complexes
-    - A10/A30: Small proteins
-    - RTX 4090: Single chains, small complexes
+    - Uses standardized BV-BRC paths (/opt/patric-common/)
 
 %environment
-    export PERL5LIB=/bvbrc/modules/app_service/lib:/bvbrc/modules/Workspace/lib:/bvbrc/modules/p3_core/lib:/bvbrc/modules/p3_auth/lib:/bvbrc/modules/seed_core/lib:/bvbrc/modules/seed_gjo/lib:/kb/module/lib
-    export KB_TOP=/kb/deployment
-    export KB_RUNTIME=/usr
+    # Standard BV-BRC Environment (from dxkb/dev_container)
+    export RT=/opt/patric-common/runtime
+    export KB_DEPLOYMENT=/opt/patric-common/deployment
+    export KB_TOP=/opt/patric-common/deployment
+    export PERL5LIB=$KB_DEPLOYMENT/lib:$RT/lib/perl5
+    export PATH=$KB_DEPLOYMENT/bin:$RT/bin:/kb/module/scripts:$PATH
+
+    # App-specific environment
     export KB_MODULE_DIR=/kb/module
     export IN_BVBRC_CONTAINER=1
     export CHAI_DOWNLOADS_DIR=/cache
-    export PATH=/kb/module/scripts:$PATH
 
 %runscript
     case "$1" in
         App-ChaiLab*)
             shift
-            exec perl /kb/module/service-scripts/App-ChaiLab.pl "$@"
+            exec $RT/bin/perl /kb/module/service-scripts/App-ChaiLab.pl "$@"
             ;;
         chai-lab|chai)
             shift
@@ -93,12 +93,25 @@ From: dxkb/chai-bvbrc:latest-gpu
     echo -n "Chai-Lab: "
     chai-lab --help 2>&1 | head -1 || echo "chai-lab command available"
 
-    # Test Perl/BV-BRC
+    # Test Perl/BV-BRC (using standard path)
     echo -n "Perl: "
-    perl -v | grep version | head -1
+    /opt/patric-common/runtime/bin/perl -v | grep version | head -1
+
+    echo -n "Perl version check: "
+    /opt/patric-common/runtime/bin/perl -v | grep -q "v5.40" && echo "5.40.x OK" || echo "WARN: expected 5.40.x"
 
     echo -n "BV-BRC modules: "
-    perl -e 'use Bio::KBase::AppService::AppScript; print "OK\n"' 2>/dev/null || echo "WARN: AppScript not fully available (expected in test)"
+    /opt/patric-common/runtime/bin/perl -e 'use Bio::KBase::AppService::AppScript; print "OK\n"' 2>/dev/null || echo "WARN: AppScript not fully available (expected in test)"
+
+    # Test standard BV-BRC paths
+    echo -n "BV-BRC runtime: "
+    test -d /opt/patric-common/runtime && echo "OK" || echo "MISSING"
+
+    echo -n "BV-BRC deployment: "
+    test -d /opt/patric-common/deployment && echo "OK" || echo "MISSING"
+
+    echo -n "p3 CLI tools: "
+    test -f /opt/patric-common/deployment/bin/p3-login && echo "OK" || echo "MISSING"
 
     # Test service script exists
     echo -n "Service script: "
@@ -119,12 +132,14 @@ From: dxkb/chai-bvbrc:latest-gpu
 
     # Verify key components
     which chai-lab || echo "Warning: chai-lab not in PATH"
-    which perl || echo "Warning: perl not in PATH"
-    which kalign || echo "Warning: kalign not in PATH"
+    test -f /opt/patric-common/runtime/bin/perl && echo "BV-BRC Perl: OK" || echo "Warning: BV-BRC Perl not found"
 
     # Create cache directory if not exists
     mkdir -p /cache
 
-    # List installed BV-BRC modules
-    echo "BV-BRC modules installed:"
-    ls -la /bvbrc/modules/ 2>/dev/null || echo "No modules directory"
+    # List BV-BRC deployment
+    echo "BV-BRC deployment contents:"
+    ls -la /opt/patric-common/deployment/bin/ 2>/dev/null | head -10 || echo "No deployment bin directory"
+
+    echo "BV-BRC lib contents:"
+    ls /opt/patric-common/deployment/lib/ 2>/dev/null | head -10 || echo "No deployment lib directory"
