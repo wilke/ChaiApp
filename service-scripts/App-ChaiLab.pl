@@ -151,18 +151,18 @@ sub run_chailab {
 
     # Constraints file
     if ($local_constraints) {
-        push @cmd, "--constraints", $local_constraints;
+        push @cmd, "--constraint-path", $local_constraints;
     }
 
-    # Pre-computed MSA
+    # Pre-computed MSA directory
     if ($local_msa) {
-        push @cmd, "--msa-file", $local_msa;
+        push @cmd, "--msa-directory", $local_msa;
     }
 
     # Template hits file
     if (my $template_file = $params->{template_hits_file}) {
         my $local_template = download_workspace_file($app, $template_file, $input_dir);
-        push @cmd, "--template-hits", $local_template;
+        push @cmd, "--template-hits-path", $local_template;
     }
 
     # Execute chai-lab
