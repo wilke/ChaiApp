@@ -144,9 +144,9 @@ sub run_chailab {
         push @cmd, "--use-templates-server";
     }
 
-    # Number of samples
+    # Number of samples (diffusion samples)
     if (my $samples = $params->{num_samples}) {
-        push @cmd, "--num-samples", $samples;
+        push @cmd, "--num-diffn-samples", $samples;
     }
 
     # Constraints file
