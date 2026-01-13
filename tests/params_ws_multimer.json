@@ -1,7 +1,7 @@
 {
-    "input_file": "/data/multimer.fasta",
-    "output_path": "/output",
-    "output_file": "multimer_test",
+    "input_file": "/awilke@bvbrc/home/AppTests/ChaiApp/input/multimer.fasta",
+    "output_path": "/awilke@bvbrc/home/AppTests/ChaiApp/output/test_ws_multimer",
+    "output_file": "ws_multimer_prediction",
     "use_msa_server": true,
     "use_templates_server": false,
     "num_samples": 1

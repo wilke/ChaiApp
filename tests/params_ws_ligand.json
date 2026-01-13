@@ -1,7 +1,8 @@
 {
-    "input_file": "/awilke@bvbrc/home/ChaiLabTest/protein_ligand.fasta",
-    "constraints_file": "/awilke@bvbrc/home/ChaiLabTest/constraints.json",
-    "output_path": "/awilke@bvbrc/home/ChaiLabTest/output_ligand",
+    "input_file": "/awilke@bvbrc/home/AppTests/ChaiApp/input/protein_ligand.fasta",
+    "constraints_file": "/awilke@bvbrc/home/AppTests/ChaiApp/input/constraints.json",
+    "output_path": "/awilke@bvbrc/home/AppTests/ChaiApp/output/test_ws_ligand",
+    "output_file": "ws_ligand_prediction",
     "use_msa_server": true,
     "use_templates_server": false,
     "num_samples": 1

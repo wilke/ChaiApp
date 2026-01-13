@@ -1,6 +1,7 @@
 {
-    "input_file": "/awilke@bvbrc/home/ChaiLabTest/simple_protein.fasta",
-    "output_path": "/awilke@bvbrc/home/ChaiLabTest/output_templates",
+    "input_file": "/awilke@bvbrc/home/AppTests/ChaiApp/input/simple_protein.fasta",
+    "output_path": "/awilke@bvbrc/home/AppTests/ChaiApp/output/test_ws_templates",
+    "output_file": "ws_templates_prediction",
     "use_msa_server": true,
     "use_templates_server": true,
     "num_samples": 1
