@@ -119,6 +119,8 @@ All test configurations are in `tests/` with unique output paths to prevent over
 | `params_ws_multisamples.json` | Multiple samples (3) | `.../output/test_ws_multisamples` |
 | `params_ws_nosamples.json` | Default samples | `.../output/test_ws_nosamples` |
 | `params_ws_templates.json` | Templates server enabled | `.../output/test_ws_templates` |
+| `params_ws_msa_dir.json` | MSA directory download | `.../output/test_ws_msa_dir` |
+| `params_ws_dry_run.json` | Dry run mode | `.../output/test_ws_dry_run` |
 | `params_missing_input.json` | Error handling test | `.../output/test_ws_error` |
 
 ---
@@ -270,7 +272,61 @@ p3-ls /awilke@bvbrc/home/AppTests/ChaiApp/output/test_ws_multisamples/
 
 ---
 
-### Test 7: Error Handling - Missing Input
+### Test 7: MSA Directory Download
+Test pre-computed MSA directory handling.
+
+**Config:** `tests/params_ws_msa_dir.json`
+```json
+{
+    "input_file": "/awilke@bvbrc/home/AppTests/ChaiApp/input/simple_protein.fasta",
+    "output_path": "/awilke@bvbrc/home/AppTests/ChaiApp/output/test_ws_msa_dir",
+    "output_file": "ws_msa_dir_prediction",
+    "msa_directory": "/awilke@bvbrc/home/AppTests/ChaiApp/input/msa",
+    "use_msa_server": false,
+    "use_templates_server": false,
+    "num_samples": 1
+}
+```
+
+**Expected:**
+- Script downloads MSA directory contents
+- chai-lab runs with `--msa-directory` flag
+- Prediction completes using pre-computed MSAs
+
+**Validation:**
+```bash
+p3-ls /awilke@bvbrc/home/AppTests/ChaiApp/output/test_ws_msa_dir/
+```
+
+---
+
+### Test 8: Dry Run Mode
+Test dry run mode (download and prepare without execution).
+
+**Config:** `tests/params_ws_dry_run.json`
+```json
+{
+    "input_file": "/awilke@bvbrc/home/AppTests/ChaiApp/input/simple_protein.fasta",
+    "output_path": "/awilke@bvbrc/home/AppTests/ChaiApp/output/test_ws_dry_run",
+    "output_file": "ws_dry_run_prediction",
+    "use_msa_server": true,
+    "use_templates_server": false,
+    "num_samples": 1,
+    "dry_run": true
+}
+```
+
+**Expected:**
+- Script downloads all input files
+- Script prints "DRY RUN MODE - skipping chai-lab execution"
+- Script prints the command that would be executed
+- Script lists input directory contents
+- No chai-lab prediction is run
+- No output files uploaded
+
+---
+
+### Test 9: Error Handling - Missing Input
 Test service script handles missing input gracefully.
 
 **Config:** `tests/params_missing_input.json`
@@ -301,9 +357,11 @@ Test service script handles missing input gracefully.
 | 4 | Multimer prediction | |
 | 5 | Templates server option | |
 | 6 | Multiple samples parameter | |
-| 7 | Error handling for missing input | |
+| 7 | MSA directory download | |
+| 8 | Dry run mode | |
+| 9 | Error handling for missing input | |
 
-**Minimum for acceptance:** Tests 1-4 and 7 pass.
+**Minimum for acceptance:** Tests 1-4, 8, and 9 pass.
 
 ---
 
