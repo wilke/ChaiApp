@@ -26,7 +26,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 use File::Basename;
-use File::Path qw(make_path);
+use File::Path qw(make_path remove_tree);
 use File::Slurp;
 use File::Copy;
 use JSON;
@@ -105,7 +105,14 @@ sub run_chailab {
     my $input_dir = "$work_dir/input";
     my $output_dir = "$work_dir/output";
 
-    make_path($input_dir, $output_dir);
+    # Ensure output directory is empty (chai-lab requirement)
+    if (-d $output_dir && !is_dir_empty($output_dir)) {
+        warn "Output directory $output_dir is not empty, cleaning...\n";
+        remove_tree($output_dir);
+    }
+
+    make_path($input_dir) unless -d $input_dir;
+    make_path($output_dir) unless -d $output_dir;
 
     # Download input FASTA file from workspace
     my $input_file = $params->{input_file};
@@ -287,6 +294,20 @@ sub upload_results {
             };
         }
     }
+}
+
+=head2 is_dir_empty
+
+Check if a directory is empty.
+
+=cut
+
+sub is_dir_empty {
+    my ($dir) = @_;
+    opendir(my $dh, $dir) or return 1;
+    my @entries = grep { $_ ne '.' && $_ ne '..' } readdir($dh);
+    closedir($dh);
+    return @entries == 0;
 }
 
 =head2 find_files
