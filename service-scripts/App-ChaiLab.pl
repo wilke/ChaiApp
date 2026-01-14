@@ -131,11 +131,26 @@ sub run_chailab {
         $local_constraints = download_workspace_file($app, $constraints_file, $input_dir);
     }
 
-    # Download optional MSA file
-    my $local_msa;
-    if (my $msa_file = $params->{msa_file}) {
-        print "Downloading MSA file: $msa_file\n";
-        $local_msa = download_workspace_file($app, $msa_file, $input_dir);
+    # Download optional MSA files into msa subdirectory
+    my $msa_dir;
+    if (my $msa_files = $params->{msa_files}) {
+        $msa_dir = "$input_dir/msa";
+        make_path($msa_dir) unless -d $msa_dir;
+
+        my @files = ref($msa_files) eq 'ARRAY' ? @$msa_files : ($msa_files);
+        for my $msa_file (@files) {
+            print "Downloading MSA file: $msa_file\n";
+            download_workspace_file($app, $msa_file, $msa_dir);
+        }
+    }
+
+    # Download optional MSA directory (workspace folder)
+    if (my $ws_msa_dir = $params->{msa_directory}) {
+        $msa_dir //= "$input_dir/msa";
+        make_path($msa_dir) unless -d $msa_dir;
+
+        print "Downloading MSA directory: $ws_msa_dir\n";
+        download_workspace_folder($app, $ws_msa_dir, $msa_dir);
     }
 
     # Build chai-lab command
@@ -162,14 +177,28 @@ sub run_chailab {
     }
 
     # Pre-computed MSA directory
-    if ($local_msa) {
-        push @cmd, "--msa-directory", $local_msa;
+    if ($msa_dir) {
+        push @cmd, "--msa-directory", $msa_dir;
     }
 
     # Template hits file
     if (my $template_file = $params->{template_hits_file}) {
         my $local_template = download_workspace_file($app, $template_file, $input_dir);
         push @cmd, "--template-hits-path", $local_template;
+    }
+
+    # Dry run mode - skip execution
+    if ($params->{dry_run}) {
+        print "DRY RUN MODE - skipping chai-lab execution\n";
+        print "Command would be: " . join(" ", @cmd) . "\n";
+        print "Input directory contents:\n";
+        list_directory($input_dir);
+        if ($msa_dir && -d $msa_dir) {
+            print "MSA directory contents:\n";
+            list_directory($msa_dir);
+        }
+        print "Dry run completed successfully\n";
+        return 0;
     }
 
     # Execute chai-lab
@@ -256,6 +285,50 @@ sub download_workspace_file {
     return $local_path;
 }
 
+=head2 download_workspace_folder
+
+Download a folder from the BV-BRC workspace.
+
+=cut
+
+sub download_workspace_folder {
+    my ($app, $ws_path, $local_dir) = @_;
+
+    # Use workspace API to list and download folder contents
+    if ($app && $app->can('workspace')) {
+        try {
+            my $files = $app->workspace->ls({paths => [$ws_path]});
+            if ($files && $files->{$ws_path}) {
+                for my $entry (@{$files->{$ws_path}}) {
+                    my ($name, $type) = @$entry;
+                    my $ws_file = "$ws_path/$name";
+                    if ($type eq 'file') {
+                        print "  Downloading: $name\n";
+                        $app->workspace->download_file($ws_file, "$local_dir/$name");
+                    }
+                }
+            }
+        } catch {
+            die "Failed to download folder $ws_path: $_\n";
+        };
+    } else {
+        # Fallback for testing without workspace
+        if (-d $ws_path) {
+            opendir(my $dh, $ws_path) or die "Cannot open $ws_path: $!\n";
+            while (my $entry = readdir($dh)) {
+                next if $entry =~ /^\./;
+                my $src = "$ws_path/$entry";
+                if (-f $src) {
+                    copy($src, "$local_dir/$entry") or die "Copy failed: $!\n";
+                }
+            }
+            closedir($dh);
+        } else {
+            die "Directory not found: $ws_path\n";
+        }
+    }
+}
+
 =head2 upload_results
 
 Upload prediction results to the BV-BRC workspace.
@@ -294,6 +367,27 @@ sub upload_results {
             };
         }
     }
+}
+
+=head2 list_directory
+
+List contents of a directory for dry run output.
+
+=cut
+
+sub list_directory {
+    my ($dir) = @_;
+    opendir(my $dh, $dir) or return;
+    while (my $entry = readdir($dh)) {
+        next if $entry =~ /^\./;
+        my $path = "$dir/$entry";
+        my $type = -d $path ? "dir" : "file";
+        my $size = -f $path ? -s $path : 0;
+        print "  [$type] $entry";
+        print " ($size bytes)" if $type eq 'file';
+        print "\n";
+    }
+    closedir($dh);
 }
 
 =head2 is_dir_empty
