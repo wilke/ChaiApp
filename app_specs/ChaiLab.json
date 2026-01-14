@@ -46,11 +46,18 @@
             "desc": "Number of structure samples to generate. Default is 5, providing a good balance of diversity and runtime."
         },
         {
-            "id": "msa_file",
-            "type": "wsfile",
+            "id": "msa_files",
+            "type": "list:wsfile",
             "required": 0,
-            "label": "Pre-computed MSA File",
-            "desc": "Optional pre-computed MSA file in aligned.pqt format. If provided, overrides MSA server for the corresponding sequence."
+            "label": "Pre-computed MSA Files",
+            "desc": "Optional list of pre-computed MSA files in aligned.pqt format (named <sequence_hash>.aligned.pqt). Files are placed in an MSA directory and used instead of the MSA server for matching sequences."
+        },
+        {
+            "id": "msa_directory",
+            "type": "folder",
+            "required": 0,
+            "label": "Pre-computed MSA Directory",
+            "desc": "Optional workspace folder containing pre-computed MSA files in aligned.pqt format. Contents are downloaded and used instead of the MSA server."
         },
         {
             "id": "template_hits_file",
@@ -65,6 +72,14 @@
             "required": 1,
             "label": "Output Folder",
             "desc": "Workspace folder where prediction results will be saved."
+        },
+        {
+            "id": "dry_run",
+            "type": "bool",
+            "default": false,
+            "required": 0,
+            "label": "Dry Run",
+            "desc": "Download and prepare all input data but do not execute chai-lab prediction. Useful for testing workspace file access and data preparation."
         }
     ],
     "preflight": {
