@@ -1,0 +1,9 @@
+{
+    "input_file": "/awilke@bvbrc/home/AppTests/ChaiApp/input/simple_protein.fasta",
+    "output_path": "/awilke@bvbrc/home/AppTests/ChaiApp/output/test_ws_msa_dir",
+    "output_file": "ws_msa_dir_prediction",
+    "msa_directory": "/awilke@bvbrc/home/AppTests/ChaiApp/input/msa",
+    "use_msa_server": false,
+    "use_templates_server": false,
+    "num_samples": 1
+}
