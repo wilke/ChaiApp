@@ -1,0 +1,8 @@
+{
+    "input_file": "/data/simple_protein.fasta",
+    "output_path": "/output",
+    "output_file": "test_prediction",
+    "use_msa_server": true,
+    "num_samples": 1,
+    "dry_run": true
+}
