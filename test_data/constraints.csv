@@ -1,0 +1,5 @@
+restraint_id,chainA,res_idxA,chainB,res_idxB,max_distance_angstrom,min_distance_angstrom,connection_type,confidence,comment
+pocket_1,L,,A,A120,6.0,,pocket,1.0,Ligand binding pocket
+pocket_2,L,,A,A145,6.0,,pocket,1.0,Ligand binding pocket
+pocket_3,L,,A,A167,6.0,,pocket,1.0,Ligand binding pocket
+pocket_4,L,,A,A189,6.0,,pocket,1.0,Ligand binding pocket

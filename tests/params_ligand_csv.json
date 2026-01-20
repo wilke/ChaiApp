@@ -1,0 +1,9 @@
+{
+    "input_file": "/awilke@bvbrc/home/AppTests/ChaiApp/input/protein_ligand.fasta",
+    "constraints_file": "/awilke@bvbrc/home/AppTests/ChaiApp/input/constraints.csv",
+    "output_path": "/awilke@bvbrc/home/AppTests/ChaiApp/output/test_ws_ligand_csv",
+    "output_file": "ws_ligand_csv_prediction",
+    "use_msa_server": true,
+    "use_templates_server": false,
+    "num_samples": 1
+}
