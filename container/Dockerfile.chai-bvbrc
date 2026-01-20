@@ -1,16 +1,45 @@
 # BV-BRC Runtime Layer for Chai-Lab
 # Uses dxkb/dev_container:cuda12-ubuntu22.04 for standardized BV-BRC runtime
 #
-# Build: docker build --platform linux/amd64 -t dxkb/chai-bvbrc:latest-gpu -f Dockerfile.chai-bvbrc .
-# Run:   docker run --gpus all -v $(pwd)/data:/data -v $(pwd)/output:/output dxkb/chai-bvbrc:latest-gpu chai-lab fold /data/input.fasta /output
+# Build with metadata:
+#   ./build.sh
+# Or manually:
+#   docker build --platform linux/amd64 \
+#     --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+#     --build-arg GIT_COMMIT=$(git rev-parse HEAD) \
+#     --build-arg GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
+#     -t dxkb/chai-bvbrc:latest-gpu -f Dockerfile.chai-bvbrc .
+#
+# Run:
+#   docker run --gpus all -v $(pwd)/data:/data -v $(pwd)/output:/output dxkb/chai-bvbrc:latest-gpu chai-lab fold /data/input.fasta /output
 
 FROM --platform=linux/amd64 dxkb/chai:latest-gpu
 
+# Build arguments for metadata
+ARG BUILD_DATE=unknown
+ARG GIT_COMMIT=unknown
+ARG GIT_BRANCH=unknown
+ARG VERSION=2.1.0
+
+# Standard OCI labels
+LABEL org.opencontainers.image.created="${BUILD_DATE}"
+LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
+LABEL org.opencontainers.image.source="https://github.com/wilke/ChaiApp"
+LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.title="Chai-Lab BV-BRC"
+LABEL org.opencontainers.image.description="Chai-1 molecular structure prediction with BV-BRC AppService integration"
+LABEL org.opencontainers.image.vendor="BV-BRC"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+
+# Application-specific labels
 LABEL maintainer="BV-BRC Team"
-LABEL description="Chai-Lab with BV-BRC AppService integration"
-LABEL version="2.0.0"
+LABEL app.name="ChaiLab"
+LABEL app.version="${VERSION}"
 LABEL base.chai="dxkb/chai:latest-gpu"
 LABEL base.bvbrc="dxkb/dev_container:cuda12-ubuntu22.04"
+LABEL build.date="${BUILD_DATE}"
+LABEL build.git.commit="${GIT_COMMIT}"
+LABEL build.git.branch="${GIT_BRANCH}"
 
 # Copy BV-BRC runtime AND build system from dev_container
 # - /opt/patric-common: Perl 5.40.2 runtime + 200 CPAN modules + p3 CLI tools
@@ -72,6 +101,12 @@ COPY service-scripts/ /kb/module/service-scripts/
 
 # Make service scripts executable
 RUN chmod +x /kb/module/service-scripts/*.pl 2>/dev/null || true
+
+# Write build info to container for runtime inspection
+RUN echo "BUILD_DATE=${BUILD_DATE}" > /kb/module/BUILD_INFO && \
+    echo "GIT_COMMIT=${GIT_COMMIT}" >> /kb/module/BUILD_INFO && \
+    echo "GIT_BRANCH=${GIT_BRANCH}" >> /kb/module/BUILD_INFO && \
+    echo "VERSION=${VERSION}" >> /kb/module/BUILD_INFO
 
 # Working directory for data
 WORKDIR /data
