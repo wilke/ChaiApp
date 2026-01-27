@@ -446,11 +446,16 @@ Find the chai-lab binary. Checks in order:
 sub find_chai_binary {
     my $binary = "chai-lab";
 
-    # Check if chai-lab is in PATH
-    my $which = `which $binary 2>/dev/null`;
-    chomp $which;
-    if ($which && -x $which) {
-        return $which;
+    # Check if chai-lab is in PATH by iterating PATH entries
+    if (my $path_env = $ENV{PATH}) {
+        my @path_dirs = split(/:/, $path_env);
+        for my $dir (@path_dirs) {
+            next unless $dir;  # Skip empty entries
+            my $full_path = "$dir/$binary";
+            if (-x $full_path && !-d $full_path) {
+                return $full_path;
+            }
+        }
     }
 
     # Check P3_CHAI_PATH environment variable
