@@ -24,6 +24,7 @@ molecular structure predictions. It handles:
 
 use strict;
 use warnings;
+use Carp::Always;  # Stack traces on errors (production debugging)
 use Data::Dumper;
 use File::Basename;
 use File::Path qw(make_path remove_tree);
