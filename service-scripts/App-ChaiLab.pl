@@ -157,8 +157,12 @@ sub run_chailab {
         download_workspace_folder($app, $ws_msa_dir, $msa_dir);
     }
 
+    # Find chai-lab binary: check PATH first, then P3_CHAI_PATH, then default
+    my $chai_bin = find_chai_binary();
+    print "Using chai-lab binary: $chai_bin\n";
+
     # Build chai-lab command
-    my @cmd = ("chai-lab", "fold", $local_input, $output_dir);
+    my @cmd = ($chai_bin, "fold", $local_input, $output_dir);
 
     # MSA server option
     if ($params->{use_msa_server} // 1) {
@@ -428,6 +432,38 @@ sub find_files {
         }
     }
     closedir($dh);
+}
+
+=head2 find_chai_binary
+
+Find the chai-lab binary. Checks in order:
+1. chai-lab in PATH
+2. P3_CHAI_PATH environment variable
+3. Default path /opt/conda-chai/bin
+
+=cut
+
+sub find_chai_binary {
+    my $binary = "chai-lab";
+
+    # Check if chai-lab is in PATH
+    my $which = `which $binary 2>/dev/null`;
+    chomp $which;
+    if ($which && -x $which) {
+        return $which;
+    }
+
+    # Check P3_CHAI_PATH environment variable
+    if (my $chai_path = $ENV{P3_CHAI_PATH}) {
+        my $bin_path = "$chai_path/$binary";
+        if (-x $bin_path) {
+            return $bin_path;
+        }
+    }
+
+    # Default to /opt/conda-chai/bin
+    $ENV{P3_CHAI_PATH} //= "/opt/conda-chai/bin";
+    return "$ENV{P3_CHAI_PATH}/$binary";
 }
 
 __END__
