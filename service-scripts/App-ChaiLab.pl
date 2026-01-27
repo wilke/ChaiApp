@@ -37,6 +37,9 @@ use Try::Tiny;
 # BV-BRC modules
 use Bio::KBase::AppService::AppScript;
 
+# Default log level for production
+$ENV{P3_LOG_LEVEL} //= 'INFO';
+
 # Initialize the AppScript with our callbacks
 my $script = Bio::KBase::AppService::AppScript->new(\&run_chailab, \&preflight);
 $script->run(\@ARGV);
