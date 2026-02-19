@@ -33,6 +33,7 @@ use File::Copy;
 use JSON;
 use Getopt::Long;
 use Try::Tiny;
+use POSIX qw(strftime);
 
 # BV-BRC modules
 use Bio::KBase::AppService::AppScript;
@@ -126,8 +127,10 @@ sub run_chailab {
     print "Downloading input file: $input_file\n";
     my $local_input = download_workspace_file($app, $input_file, $input_dir);
 
-    # Validate input is FASTA
+    # Validate and rewrite FASTA for Chai-Lab compatibility
     validate_fasta($local_input);
+    print "Rewriting FASTA identifiers for Chai-Lab...\n";
+    my ($chai_input, $mapping_file) = rewrite_fasta_for_chai($local_input, $input_dir);
 
     # Download optional constraints file
     my $local_constraints;
@@ -162,8 +165,15 @@ sub run_chailab {
     my $chai_bin = find_chai_binary();
     print "Using chai-lab binary: $chai_bin\n";
 
+    # Set CHAI_DOWNLOADS_DIR to a writable location for conformer cache files
+    # Chai-Lab tries to download cache files on first run; this must be writable
+    my $chai_cache_dir = "$work_dir/chai_cache";
+    make_path($chai_cache_dir) unless -d $chai_cache_dir;
+    $ENV{CHAI_DOWNLOADS_DIR} = $chai_cache_dir;
+    print "Chai cache directory: $chai_cache_dir\n";
+
     # Build chai-lab command
-    my @cmd = ($chai_bin, "fold", $local_input, $output_dir);
+    my @cmd = ($chai_bin, "fold", $chai_input, $output_dir);
 
     # MSA server option
     if ($params->{use_msa_server} // 1) {
@@ -220,12 +230,35 @@ sub run_chailab {
 
     print "Chai-lab prediction completed successfully\n";
 
-    # Upload results to workspace
-    my $output_path = $params->{output_path};
-    die "Output path is required\n" unless $output_path;
+    # Get output folder from app framework
+    my $output_folder = $app->result_folder();
+    die "Could not get result folder from app framework\n" unless $output_folder;
 
-    print "Uploading results to workspace: $output_path\n";
-    upload_results($app, $output_dir, $output_path);
+    # Clean up trailing slashes/dots
+    $output_folder =~ s/\/+$//;
+    $output_folder =~ s/\/\.$//;
+
+    # Use output_file parameter as base name, create unique subfolder
+    my $output_base = $params->{output_file} // "chailab_result";
+    my $timestamp = POSIX::strftime("%Y%m%d_%H%M%S", localtime);
+    my $task_id = $app->{task_id} // "unknown";
+    my $run_folder = "${output_base}_${timestamp}_${task_id}";
+    $output_folder = "$output_folder/$run_folder";
+
+    print "Uploading results to workspace: $output_folder\n";
+    upload_results($app, $output_dir, $output_folder);
+
+    # Also upload the sequence ID mapping file
+    if (-f $mapping_file) {
+        print "Uploading sequence ID mapping: $mapping_file\n";
+        if ($app && $app->can('workspace')) {
+            try {
+                $app->workspace->save_file_to_file($mapping_file, {}, "$output_folder/sequence_id_mapping.json", "json", 1, 1);
+            } catch {
+                warn "Failed to upload mapping file: $_\n";
+            };
+        }
+    }
 
     print "Chai-lab job completed\n";
     return 0;
@@ -261,6 +294,145 @@ sub validate_fasta {
     }
 
     return 1;
+}
+
+=head2 rewrite_fasta_for_chai
+
+Rewrite FASTA file to use Chai-Lab compatible identifiers.
+
+Chai-Lab expects headers in format: >entity_type|chain_id
+For example: >protein|A, >protein|B, >smiles|L, >dna|D
+
+This function:
+1. Reads the input FASTA
+2. Assigns chain IDs (A, B, C, ...) to each sequence
+3. Detects entity type (protein, dna, rna, smiles)
+4. Writes a new FASTA with Chai-compatible headers
+5. Creates a mapping file to track original IDs
+
+Returns: ($new_fasta_path, $mapping_file_path)
+
+=cut
+
+sub rewrite_fasta_for_chai {
+    my ($input_file, $output_dir) = @_;
+
+    my $content = read_file($input_file, { binmode => ':raw' });
+
+    # Parse sequences - split on header lines
+    my @entries;
+    my @blocks = split(/(?=^>)/m, $content);
+
+    for my $block (@blocks) {
+        next unless $block =~ /\S/;  # Skip empty blocks
+        next unless $block =~ /^>/;  # Must start with >
+
+        # Split header from sequence
+        my ($header_line, @seq_lines) = split(/\n/, $block);
+
+        # Extract header (remove leading >)
+        my $header = $header_line;
+        $header =~ s/^>//;
+        $header =~ s/\s+$//;  # Trim trailing whitespace
+
+        # Join sequence lines and remove all whitespace
+        my $seq = join('', @seq_lines);
+        $seq =~ s/\s+//g;
+
+        if (length($seq) > 0) {
+            push @entries, {
+                original_header => $header,
+                sequence => $seq,
+            };
+        } else {
+            warn "Warning: Empty sequence for header: $header\n";
+        }
+    }
+
+    die "No sequences found in FASTA file\n" unless @entries;
+
+    # Assign chain IDs and detect entity types
+    my @chain_ids = ('A'..'Z', 'a'..'z');  # Up to 52 chains
+    my @mapping;
+    my @new_fasta_lines;
+
+    for my $i (0 .. $#entries) {
+        my $entry = $entries[$i];
+        my $chain_id = $chain_ids[$i] // die "Too many sequences (max 52 supported)\n";
+
+        # Detect entity type from sequence content
+        my $entity_type = detect_entity_type($entry->{sequence}, $entry->{original_header});
+
+        # Build new header
+        my $new_header = "$entity_type|$chain_id";
+
+        push @new_fasta_lines, ">$new_header\n$entry->{sequence}\n";
+
+        push @mapping, {
+            chain_id => $chain_id,
+            entity_type => $entity_type,
+            original_id => $entry->{original_header},
+        };
+
+        print "  Chain $chain_id ($entity_type): $entry->{original_header}\n";
+    }
+
+    # Write new FASTA
+    my $new_fasta = "$output_dir/chai_input.fasta";
+    write_file($new_fasta, join('', @new_fasta_lines));
+
+    # Write mapping file (JSON)
+    my $mapping_file = "$output_dir/sequence_id_mapping.json";
+    write_file($mapping_file, encode_json(\@mapping));
+
+    print "Rewrote FASTA for Chai-Lab: $new_fasta\n";
+    print "ID mapping saved to: $mapping_file\n";
+
+    return ($new_fasta, $mapping_file);
+}
+
+=head2 detect_entity_type
+
+Detect the entity type (protein, dna, rna, smiles) from sequence content.
+
+=cut
+
+sub detect_entity_type {
+    my ($sequence, $header) = @_;
+
+    # Check header for explicit type hints
+    if ($header =~ /\|\s*(protein|dna|rna|smiles)\s*(\||$)/i) {
+        return lc($1);
+    }
+
+    # Check if it's a SMILES string (contains special characters)
+    if ($sequence =~ /[=#@\[\]\(\)\+\-]/ && $sequence =~ /^[A-Za-z0-9=#@\[\]\(\)\+\-\.\\\/%]+$/) {
+        return 'smiles';
+    }
+
+    # Normalize sequence for analysis
+    my $upper_seq = uc($sequence);
+
+    # Count nucleotide vs amino acid characters
+    my $dna_chars = ($upper_seq =~ tr/ATCG//);
+    my $rna_chars = ($upper_seq =~ tr/AUCG//);
+    my $protein_chars = ($upper_seq =~ tr/ACDEFGHIKLMNPQRSTVWY//);
+
+    my $seq_len = length($sequence);
+    return 'protein' if $seq_len == 0;  # Default for empty
+
+    # If >90% DNA nucleotides (ATCG only), it's DNA
+    if ($dna_chars / $seq_len > 0.9 && $upper_seq !~ /U/) {
+        return 'dna';
+    }
+
+    # If contains U and >90% RNA nucleotides, it's RNA
+    if ($upper_seq =~ /U/ && $rna_chars / $seq_len > 0.9) {
+        return 'rna';
+    }
+
+    # Default to protein
+    return 'protein';
 }
 
 =head2 download_workspace_file
@@ -353,32 +525,18 @@ sub upload_results {
     my @files;
     find_files($local_dir, \@files);
 
-    for my $file (@files) {
-        my $rel_path = $file;
-        $rel_path =~ s/^\Q$local_dir\E\/?//;
+    my @mapping = ('--map-suffix' => "txt=txt",
+		   '--map-suffix' => "pdb=pdb",
+		   '--map-suffix' => "cif=cif",
+		   '--map-suffix' => "mmcif=mmcif",
+		   '--map-suffix' => "fasta=protein_feature_fasta",
+		   '--map-suffix' => "fa=protein_feature_fasta",
+		   '--map-suffix' => "faa=protein_feature_fasta");
 
-        my $ws_file = "$ws_path/$rel_path";
-        print "Uploading: $file -> $ws_file\n";
-
-        if ($app && $app->can('workspace')) {
-            try {
-                # Determine file type for workspace
-                my $type = "txt";
-                if ($file =~ /\.(pdb|cif|mmcif)$/i) {
-                    $type = "structure";
-                } elsif ($file =~ /\.json$/i) {
-                    $type = "json";
-                } elsif ($file =~ /\.(fasta|fa|faa)$/i) {
-                    $type = "fasta";
-                }
-
-                # Pass type and enable overwrite
-                $app->workspace->save_file_to_file($file, {}, $ws_file, $type, 1);
-            } catch {
-                warn "Failed to upload $file: $_\n";
-            };
-        }
-    }
+    my @cmd = ("p3-cp", "--overwrite", "-r", @mapping, $local_dir, "ws:$ws_path");
+    print "@cmd=n";
+    my $rc = system(@cmd);
+    $rc == 0 or die "Error copying data to workspace\n";
 }
 
 =head2 list_directory
