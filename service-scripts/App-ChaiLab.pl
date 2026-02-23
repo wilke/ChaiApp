@@ -167,10 +167,17 @@ sub run_chailab {
 
     # Set CHAI_DOWNLOADS_DIR to a writable location for conformer cache files
     # Chai-Lab tries to download cache files on first run; this must be writable
-    my $chai_cache_dir = "$work_dir/chai_cache";
-    make_path($chai_cache_dir) unless -d $chai_cache_dir;
-    $ENV{CHAI_DOWNLOADS_DIR} = $chai_cache_dir;
-    print "Chai cache directory: $chai_cache_dir\n";
+    #
+    # In the container environment, CHAI_DOWNLOADS_DIR will have been set by the
+    # container build to a preloaded directory of data.
+    #
+    if (!$ENV{CHAI_DOWNLOADS_DIR})
+    {
+	my $chai_cache_dir = "$work_dir/chai_cache";
+	make_path($chai_cache_dir) unless -d $chai_cache_dir;
+	$ENV{CHAI_DOWNLOADS_DIR} = $chai_cache_dir;
+	print "Chai cache directory: $chai_cache_dir\n";
+    }
 
     # Build chai-lab command
     my @cmd = ($chai_bin, "fold", $chai_input, $output_dir);
