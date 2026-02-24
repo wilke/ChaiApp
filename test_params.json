@@ -1,0 +1,5 @@
+{
+    "input_file": "/olson@patricbrc.org/home/test/ecoli.one",
+    "output_path": "/olson@patricbrc.org/home/test/chailab_output",
+    "output_file": "ecoli_chai_result"
+}
